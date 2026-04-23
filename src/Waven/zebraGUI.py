@@ -6,9 +6,9 @@ Created on Wed Mar 25 19:31:32 2025
 import tkinter as tk
 from tkinter import ttk, messagebox
 import os
-from .WaveletGenerator import *
-from .LoadPinkNoise import *
-from .Analysis_Utils import *
+from Waven.WaveletGenerator import *
+from Waven.LoadPinkNoise import *
+from Waven.Analysis_Utils import *
 from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg, NavigationToolbar2Tk
 import sys
 
@@ -157,12 +157,12 @@ def run(param_defaults, gabor_param):
         deg_per_pix = abs(xM - xm) / nx
         sigmas_deg = np.trunc(2 * deg_per_pix * sigmas * 100) / 100
 
-        print(pathdata)
-        print(pathsuite2p)
-        if spks_path == 'None':
-            print('aligning datas')
-            spks, spks_n, neuron_pos = loadSPKMesoscope(exp_info, dirs, pathsuite2p, block_end, n_planes, nb_frames,
-                                                        threshold=1.25, last=True, method='frame2ttl')
+        #print(pathdata)
+        #print(pathsuite2p)
+        #if spks_path == 'None':
+        #    print('aligning datas')
+        #    spks, spks_n, neuron_pos = loadSPKMesoscope(exp_info, dirs, pathsuite2p, block_end, n_planes, nb_frames,
+        #                                                threshold=1.25, last=True, method='frame2ttl')
 
             # ly = np.ceil(np.max(neuron_pos[:, 0]) / 3)
             # lx = np.ceil(np.max(neuron_pos[:, 1]))
@@ -172,16 +172,17 @@ def run(param_defaults, gabor_param):
             # neuron_pos[neuron_pos[:, 0] > 2 * ly] = neuron_pos[neuron_pos[:, 0] > 2 * ly] + np.array([-2 * ly, 2 * lx])
             #
             # neuron_pos[:, 1]=abs(neuron_pos[:, 1]-1700)
-            neuron_pos = correctNeuronPos(neuron_pos, resolution)
-            neuron_pos[:, 1] = abs(neuron_pos[:, 1] - np.max(neuron_pos[:, 1]))
-        else:
-            print('loading spks file')
-            try:
-                spks = np.load(spks_path)
-                parent_dir = os.path.dirname(spks_path)
-                neuron_pos = np.load(os.join(parent_dir, 'pos.npy'))
-            except Exception as e:
-                messagebox.showerror("Error", f"File not found: {spks_path} {e}")
+        #   neuron_pos = correctNeuronPos(neuron_pos, resolution)
+        #    neuron_pos[:, 1] = abs(neuron_pos[:, 1] - np.max(neuron_pos[:, 1]))
+        #else:
+        print('loading spks file')
+        try:
+            spks = np.load(spks_path)
+            parent_dir = os.path.dirname(spks_path)
+            neuron_pos = np.load(os.path.join(parent_dir, 'component_centers.npy'))
+        except Exception as e:
+            messagebox.showerror("Error", f"File not found: {spks_path} {e}")
+                
 
         respcorr = repetability_trial3(spks, neuron_pos, plotting=False)
         skewness = compute_skewness_neurons(spks, plotting=False)
@@ -192,11 +193,13 @@ def run(param_defaults, gabor_param):
             widget.destroy()
 
         fig1, ax1 = plt.subplots(figsize=(6, 6))
-        ax1.scatter(neuron_pos[:, 0], neuron_pos[:, 1], c='k', alpha=0.5, label="Neurons", picker=True)
+        ax1.scatter(neuron_pos[:, 0], neuron_pos[:, 1], c=respcorr, alpha=0.5, label="Neurons", picker=True)
         ax1.set_title("Neuron Positions (um)")
+        ax1.invert_yaxis()
+        ax1.set_aspect('equal')
 
         fig2, ax2 = plt.subplots(figsize=(10, 1.5))
-        ax2.set_title("Spike Train")
+        ax2.set_title("Activity data")
 
         fig3, ax3 = plt.subplots(1, 5, figsize=(15, 1.5))
 
@@ -207,9 +210,14 @@ def run(param_defaults, gabor_param):
         def onpick(event):
             ind = event.ind
             neuron_id = ind[0]
+            plot_neuron(neuron_id)
+            
+        def plot_neuron(neuron_id):
             ax2.clear()
-            ax2.plot(np.mean(spks[:, :, neuron_id], axis=0), label=f"Neuron {neuron_id} Spike Times")
-            ax2.legend()
+            for i in range(spks.shape[0]):
+                ax2.plot(spks[i, :, neuron_id], alpha=0.5)
+            ax2.plot(np.mean(spks[:, :, neuron_id], axis=0), label=f"Neuron {neuron_id} activity data (R={respcorr[neuron_id]:.2f})", c='r')
+            ax2.legend(loc='upper right')
             canvas2.draw()
 
             rf2d, x_tuning, y_tuning, ori_tun, s_tuning = PlotTuningCurve(rfs_gabor,
@@ -226,6 +234,7 @@ def run(param_defaults, gabor_param):
             ax3[0].set_xticks([0, rf2d.shape[1]], [xM, xm])
             ax3[0].set_yticks([0, rf2d.shape[0]], [yM, ym])
             ax3[0].set_title('2D')
+            ax3[0].set_aspect('equal')
             ax3[1].plot(x_tuning[::-1], c='k')
             ax3[1].set_title('Elevation (deg)')
             ax3[1].set_xticks([0, rf2d.shape[0]], [ym, yM])
@@ -239,6 +248,10 @@ def run(param_defaults, gabor_param):
             ax3[4].set_title('Size (deg)')
             ax3[4].set_xticks([0, len(sigmas) - 1], [sigmas_deg[0], sigmas_deg[-1]])
             canvas3.draw()
+            
+        def click_RF():
+            neuron_id = int(param_entries["neuron_ID"].get())
+            plot_neuron(neuron_id)
 
         # Affichage dans l'interface
         canvas1 = FigureCanvasTkAgg(fig1, master=frame_plot)
@@ -260,7 +273,7 @@ def run(param_defaults, gabor_param):
         fig1.canvas.mpl_connect('pick_event', onpick)
 
         # Rendre les neurones sélectionnables (pickable)
-        ax1.scatter(neuron_pos[:, 0], neuron_pos[:, 1], c='k', alpha=0.1, label="Neuron positions", picker=True)
+        ax1.scatter(neuron_pos[:, 0], neuron_pos[:, 1], c=respcorr, alpha=0.1, label="Neuron positions", picker=True)
 
         # Afficher le plot dans l'interface
         # canvas = FigureCanvasTkAgg(fig, master=frame1)
@@ -314,25 +327,42 @@ def run(param_defaults, gabor_param):
                                                                                   n_theta, ns)
 
         idx = 2441  # 2272
-        rfs_gabor = PearsonCorrelationPinkNoise(w_c_downsampled.reshape(18000, -1), np.mean(spks[:, :18000], axis=0),
-                                                neuron_pos, 27, 11, ns, analysis_coverage, screen_ratio, sigmas_deg,
+        print("correlation... ")
+        rfs_gabor = PearsonCorrelationPinkNoise(w_c_downsampled.reshape(5460, -1), np.mean(spks[:, :5460], axis=0),
+                                                neuron_pos, 27, 11, 8, ns, analysis_coverage, screen_ratio, sigmas_deg,
                                                 plotting=True)
+        
+        
+        print("correlation done")
 
         fig10, ax10 = plt.subplots(1, 4, figsize=(15, 1.5))
         maxes1 = rfs_gabor[2]
         plt.rcParams['axes.facecolor'] = 'none'
-        m = ax10[0].scatter(neuron_pos[:, 0], neuron_pos[:, 1], s=5, c=maxes1[0], cmap='jet', alpha=filter)
+        
+        fig10.canvas.mpl_connect('pick_event', onpick)
+        m = ax10[0].scatter(neuron_pos[:, 0], neuron_pos[:, 1], s=5, c=maxes1[0], cmap='jet', alpha=filter, picker=True)
         fig10.colorbar(m)
         ax10[0].set_title('Azimuth (deg)')
-        m = ax10[1].scatter(neuron_pos[:, 0], neuron_pos[:, 1], s=5, c=maxes1[1], cmap='jet_r', alpha=filter)
+        ax10[0].invert_yaxis()            
+        ax10[0].set_aspect('equal')
+        
+        m = ax10[1].scatter(neuron_pos[:, 0], neuron_pos[:, 1], s=5, c=maxes1[1], cmap='jet_r', alpha=filter, picker=True)
         fig10.colorbar(m)
-        ax10[1].set_title('elevation (deg)')
-        m = ax10[2].scatter(neuron_pos[:, 0], neuron_pos[:, 1], s=5, c=maxes1[2], cmap='hsv', alpha=filter)
+        ax10[1].set_title('Elevation (deg)')
+        ax10[1].invert_yaxis()
+        ax10[1].set_aspect('equal')
+        
+        m = ax10[2].scatter(neuron_pos[:, 0], neuron_pos[:, 1], s=5, c=maxes1[2], cmap='hsv', alpha=filter, picker=True)
         fig10.colorbar(m)
         ax10[2].set_title('Orientation (deg)')
-        m = ax10[3].scatter(neuron_pos[:, 0], neuron_pos[:, 1], s=5, c=maxes1[3], cmap='coolwarm', alpha=filter)
+        ax10[2].invert_yaxis()
+        ax10[2].set_aspect('equal')
+        
+        m = ax10[3].scatter(neuron_pos[:, 0], neuron_pos[:, 1], s=5, c=maxes1[3], cmap='coolwarm', alpha=filter, picker=True)
         fig10.colorbar(m)
         ax10[3].set_title('Size (deg)')
+        ax10[3].invert_yaxis()
+        ax10[3].set_aspect('equal')
 
         canvas4 = FigureCanvasTkAgg(fig10, master=frame_plot)
         canvas4.draw()
@@ -352,43 +382,11 @@ def run(param_defaults, gabor_param):
 
         tk.Label(frame_params, text='neuron_ID', bg="white").grid(row=15, column=0, sticky="w", pady=2)
         entry = tk.Entry(frame_params, width=40)
-        entry.insert(0, '1173')
+        entry.insert(0, '13')
         entry.grid(row=19, column=1, pady=2)
         param_entries['neuron_ID'] = entry
 
-        def click_RF():
-            neuron_id = int(param_entries["neuron_ID"].get())
-            ax2.clear()
-            ax2.plot(np.mean(spks[:, :, neuron_id], axis=0), label=f"Neuron {neuron_id} Spike Times")
-            ax2.legend()
-            canvas2.draw()
 
-            rf2d, x_tuning, y_tuning, ori_tun, s_tuning = PlotTuningCurve(rfs_gabor,
-                                                                          neuron_id, analysis_coverage, sigmas_deg,
-                                                                          screen_ratio,
-                                                                          show=False)
-            ax3[0].clear()
-            ax3[1].clear()
-            ax3[2].clear()
-            ax3[3].clear()
-            ax3[4].clear()
-            ax3[0].imshow(rf2d, cmap='coolwarm')
-            ax3[0].set_xticks([0, rf2d.shape[1]], [xM, xm])
-            ax3[0].set_yticks([0, rf2d.shape[0]], [yM, ym])
-            ax3[0].set_title('2D')
-            ax3[1].plot(x_tuning[::-1], c='k')
-            ax3[1].set_title('Elevation (deg)')
-            ax3[1].set_xticks([0, rf2d.shape[0]], [ym, yM])
-            ax3[2].plot(y_tuning, c='k')
-            ax3[2].set_title('Azimuth')
-            ax3[2].set_xticks([0, rf2d.shape[1]], [xM, xm])
-            ax3[3].plot(ori_tun, 'o-', c='k')
-            ax3[3].set_title('Orientation')
-            ax3[3].set_xticks([0, 4, 8], [0, 90, 180])
-            ax3[4].plot(s_tuning, 'o-', c='k')
-            ax3[4].set_title('Size (deg)')
-            ax3[4].set_xticks([0, len(sigmas) - 1], [sigmas_deg[0], sigmas_deg[-1]])
-            canvas3.draw()
 
         def click_save():
             np.save('correlation_matrix.npy', rfs_gabor[0])
@@ -494,5 +492,6 @@ def run(param_defaults, gabor_param):
 
     root.mainloop()
 
-
+if __name__ == "__main__":
+    print("!!!! Do not run GUI from here!!!")
 

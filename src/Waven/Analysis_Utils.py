@@ -31,7 +31,7 @@ from sklearn.cluster import spectral_clustering
 from sklearn.feature_extraction import image
 from sklearn.cluster import KMeans
 import cv2 as cv
-from .LoadPinkNoise import load_stimulus_simple_cell2
+
 import gc
 import matplotlib.gridspec as gridspec
 from sklearn.decomposition import NMF
@@ -441,7 +441,7 @@ def repetability_trial(resps_all, neuron_pos):
 
 
 
-def repetability_trial2(resps_all, neuron_pos):
+def repetability_trial2(resps_all, neuron_pos, plotting=True):
     ## repetability across trial
     n_cell=resps_all.shape[2]
     i = 0
@@ -461,10 +461,11 @@ def repetability_trial2(resps_all, neuron_pos):
 
     respcorrs3 = np.array(respcorrs)
 
-    plt.figure()
-    plt.rcParams['axes.facecolor'] = 'none'
-    plt.scatter(neuron_pos[:, 1], neuron_pos[:, 0], s=5,vmin=0, vmax=1, c=respcorrs, cmap='Greys')
-    plt.colorbar()
+    if plotting:
+        plt.figure()
+        plt.rcParams['axes.facecolor'] = 'none'
+        plt.scatter(neuron_pos[:, 1], neuron_pos[:, 0], s=5,vmin=0, vmax=1, c=respcorrs, cmap='Greys')
+        plt.colorbar()
 
     return respcorrs3
 
@@ -490,7 +491,7 @@ def repetability_trial3(resps_all, neuron_pos, plotting=True):
     respcorrs = []
     if resps_all.shape[0] == 4:
         for i in range(n_cell):
-            print(i)
+            #print(i)
             meanresp1 = np.mean(resps_all[[0, 2], :, i], axis=0)
             meanresp2 = np.mean(resps_all[[1, 3], :, i], axis=0)
             respcorr = np.corrcoef(meanresp1, meanresp2)[0, 1]
@@ -498,7 +499,7 @@ def repetability_trial3(resps_all, neuron_pos, plotting=True):
 
     if resps_all.shape[0] == 5:
         for i in range(n_cell):
-            print(i)
+            #print(i)
             meanresp1 = np.mean(resps_all[[0, 2, 4], :, i], axis=0)
             meanresp2 = np.mean(resps_all[[1, 3], :, i], axis=0)
             respcorr = np.corrcoef(meanresp1, meanresp2)[0, 1]
@@ -506,7 +507,7 @@ def repetability_trial3(resps_all, neuron_pos, plotting=True):
 
     if resps_all.shape[0] == 2:
         for i in range(n_cell):
-            print(i)
+            #print(i)
             meanresp1 = np.mean(resps_all[[0], :, i], axis=0)
             meanresp2 = np.mean(resps_all[[1], :, i], axis=0)
             respcorr = np.corrcoef(meanresp1, meanresp2)[0, 1]
@@ -514,7 +515,7 @@ def repetability_trial3(resps_all, neuron_pos, plotting=True):
 
     if resps_all.shape[0] == 3:
         for i in range(n_cell):
-            print(i)
+            #print(i)
             meanresp1 = np.mean(resps_all[[0, 2], :, i], axis=0)
             meanresp2 = np.mean(resps_all[[1], :, i], axis=0)
             respcorr = np.corrcoef(meanresp1, meanresp2)[0, 1]
@@ -3296,6 +3297,7 @@ def run_Full_Model( maxes1, maxes0, spks,idxs,thetas,sigmas, frequencies,visual_
                     savepath = '/home/sophie/Pictures/img zebra/supp/supp/', n_min=5, tt=[10, 18000],
                     memmapping=True, train_idx=[0, 2],test_idx=[1, 3],double_wavelet_model=False, lastmin=False,
                     plotting=False ):
+    from Waven.LoadPinkNoise import load_stimulus_simple_cell2
     Predictions = []
     Metrics = []
     Params = []
